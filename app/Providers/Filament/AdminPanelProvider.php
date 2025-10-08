@@ -29,7 +29,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => '#00E131',
             ])
             ->brandLogo(asset('assets/images/svg/suar-logo.svg'))
             ->brandLogoHeight('2rem')
