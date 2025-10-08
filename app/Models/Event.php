@@ -13,7 +13,7 @@ class Event extends Model
         'title',
         'description',
         'type',
-        'capaticy',
+        'capacity',
         'status',
     ];
 
