@@ -14,6 +14,7 @@ class Ticket extends Model
         'ticket_package_id',
         'participant_id',
         'status',
+        'phone',
     ];
 
     public function event()
@@ -21,9 +22,9 @@ class Ticket extends Model
         return $this->belongsTo(Event::class);
     }
 
-    public function ticketPackages()
+    public function ticketPackage()
     {
-        return $this->belongsTo(TicketPackage::class);
+        return $this->belongsTo(TicketPackage::class, 'ticket_package_id');
     }
 
     public function participant()

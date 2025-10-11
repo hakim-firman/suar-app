@@ -21,6 +21,8 @@ class EventsTable
             ->columns([
                 TextColumn::make('title')
                     ->searchable(),
+                TextColumn::make('code')
+                    ->searchable(),
                 TextColumn::make('type')
                     ->searchable(),
                 TextColumn::make('capacity')

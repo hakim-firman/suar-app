@@ -14,13 +14,21 @@ class EventForm
         return $schema
             ->components([
                 TextInput::make('title')
+                    ->label('Title')
+                    ->required(),
+                TextInput::make('code')
+                    ->label('Code')
                     ->required(),
                 Textarea::make('description')
+                    ->label('Description')
                     ->columnSpanFull(),
-                TextInput::make('type'),
+                TextInput::make('type')
+                    ->label('Type'),
                 TextInput::make('capacity')
+                    ->label('Capacity')
                     ->numeric(),
                 Toggle::make('status')
+                    ->label('Status')
                     ->default(true)
                     ->required(),
             ]);

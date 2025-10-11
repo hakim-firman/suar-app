@@ -6,6 +6,8 @@ use Filament\Tables\Table;
 use Filament\Schemas\Schema;
 use Filament\Actions\CreateAction;
 use Filament\Forms\Components\Toggle;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Forms\Components\TextInput;
 use App\Filament\Resources\Events\EventResource;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -46,6 +48,18 @@ class TicketPackagesRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
+            ->columns([
+                TextColumn::make('name')
+                    ->searchable(),
+                TextColumn::make('price')
+                    ->numeric()
+                    ->searchable(),
+                TextColumn::make('quota')
+                    ->numeric()
+                    ->sortable(),
+                IconColumn::make('status')
+                    ->boolean(),
+            ])
             ->headerActions([
                 CreateAction::make(),
             ]);
