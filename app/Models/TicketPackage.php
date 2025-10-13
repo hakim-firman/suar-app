@@ -21,9 +21,14 @@ class TicketPackage extends Model
     {
         return $this->belongsTo(Event::class);
     }
-    
+
     public function tickets()
     {
         return $this->hasMany(Ticket::class);
+    }
+
+    public function scopeSelectTicket($query, $name)
+    {
+        return $query->where('name', $name);
     }
 }

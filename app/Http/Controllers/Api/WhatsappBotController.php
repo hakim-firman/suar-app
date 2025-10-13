@@ -136,9 +136,8 @@ class WhatsappBotController extends Controller
             return "Event tidak ditemukan. Silakan ketik ulang *kode event*.";
         }
 
-        $package = $event->ticketPackages
-            ->firstWhere('name', 'ilike', $packageName); // support case-insensitive
-
+        $package = TicketPackage::where('name', $packageName)->where('event_id', $eventId)->first(); // support case-insensitive
+        
         if (!$package) {
             return "Paket *{$packageName}* tidak ditemukan untuk event ini.\n"
                 . "Silakan periksa kembali nama paketnya.";
