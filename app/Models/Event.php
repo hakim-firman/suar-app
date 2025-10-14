@@ -40,4 +40,12 @@ class Event extends Model
     {
         return $this->hasMany(Ticket::class);
     }
+
+    public function getTotalTicketsSoldAttribute(): int
+    {
+        return $this->ticketPackages()
+            ->withCount('tickets')
+            ->get()
+            ->sum('tickets_count');
+    }
 }

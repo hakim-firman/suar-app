@@ -31,4 +31,14 @@ class TicketPackage extends Model
     {
         return $query->where('name', $name);
     }
+
+    public function getRemainingQuotaAttribute(): int
+    {
+        return $this->quota - $this->tickets()->count();
+    }
+
+    public function getSoldTicketsAttribute(): int
+    {
+        return $this->tickets()->count();
+    }
 }

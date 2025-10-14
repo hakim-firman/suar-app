@@ -16,7 +16,7 @@ use App\Models\TicketPackage;
 class WhatsappBotController extends Controller
 {
     /**
-     * Webhook utama - pesan masuk dari Twilio
+     * Twilio Webhook Entry Point
      */
     public function handleWebhook(Request $request)
     {
@@ -29,7 +29,7 @@ class WhatsappBotController extends Controller
             }
 
             $userPhone = str_replace('whatsapp:', '', $from);
-            Log::info('Incoming message', ['from' => $userPhone, 'body' => $body]);
+            Log::info('Incoming WhatsApp message', ['from' => $userPhone, 'body' => $body]);
 
             $reply = $this->processMessage($userPhone, $body);
 
@@ -48,7 +48,7 @@ class WhatsappBotController extends Controller
     }
 
     /**
-     * Callback status dari Twilio
+     * Callback status from Twilio
      */
     public function handleCallback(Request $request)
     {
@@ -62,70 +62,80 @@ class WhatsappBotController extends Controller
     }
 
     /**
-     * Logic utama chatbot
+     * Main bot logic
      */
     private function processMessage(string $userPhone, string $body): string
     {
-        // Reset sesi
-        if (in_array($body, ['batal', 'cancel'])) {
+        // Reset user session
+        if (in_array($body, ['cancel', 'reset', 'stop'])) {
             Cache::forget('event_' . $userPhone);
-            return "Sesi Anda dibatalkan.\nKetik kode event untuk memulai kembali.";
+            return "🔁 Your session has been reset.\nType *help* or *hi* to start again.";
         }
 
-        // Cek apakah user sedang dalam sesi event
         $currentEvent = Cache::get('event_' . $userPhone);
 
-        // 1️⃣ Pesan pertama atau belum pilih event
+        if (in_array($body, ['hi', 'hello', 'help', 'menu']) && !$currentEvent) {
+            $events = Event::where('status', true)->get(['id', 'title', 'code', 'description']);
+            if ($events->isEmpty()) {
+                return "❌ No active events available right now.";
+            }
+
+            $reply = "👋 *Welcome to the WhatsApp Ticket Assistant!*\n\n"
+                . "Here are the currently available events:\n\n";
+
+            foreach ($events as $ev) {
+                $reply .= "🎫 *{$ev->title}* — Code: *{$ev->code}*\n";
+            }
+
+            $reply .= "\nPlease type the *event code* (e.g. *EV001*) to view ticket options.";
+            return $reply;
+        }
+
         if (!$currentEvent) {
-            // Jika user mengetik kode event
-            $event = Event::where('code', strtoupper($body))
+            $event = Event::whereRaw('LOWER(code) = ?', [strtolower($body)])
                 ->where('status', true)
                 ->with(['ticketPackages' => fn($q) => $q->where('status', true)])
                 ->first();
 
             if (!$event) {
-                return "👋 Halo! Selamat datang di *Sistem Tiket WhatsApp*.\n\n"
-                    . "Silakan masukkan *kode event* untuk melihat detailnya.\n\n"
-                    . "Contoh: *EV001*";
+                return "❌ Event not found.\nPlease type a valid *event code* or type *help* to see the list.";
             }
 
-            // Simpan sesi event
             Cache::put('event_' . $userPhone, $event->id, now()->addMinutes(30));
 
             $reply = "📢 *{$event->title}*\n"
                 . "{$event->description}\n\n"
-                . "🎟️ *Daftar Paket Tiket:*\n";
+                . "🎟️ *Available Ticket Packages:*\n";
 
             foreach ($event->ticketPackages as $pkg) {
                 $remaining = $pkg->quota - $pkg->tickets()->count();
-                $reply .= "- *{$pkg->name}* (Rp " . number_format($pkg->price) . ") — Sisa: {$remaining}\n";
+                $reply .= "- *{$pkg->name}* — Rp " . number_format($pkg->price) . " — Remaining: {$remaining}\n";
             }
 
-            $reply .= "\nUntuk memesan, kirim dengan format:\n"
-                . "*daftar [Nama]#[Gender]#[Umur]#[Pekerjaan]#[Nama Paket]*\n"
-                . "Contoh: *daftar Budi#laki#25#Programmer#VIP*";
+            $reply .= "\nTo book, please reply in this format:\n"
+                . "*register Name#Gender#Age#Job#PackageName*\n"
+                . "Example: *register John Doe#male#25#Engineer#VIP*";
 
             return $reply;
         }
 
-        // 2️⃣ Sudah memilih event → cek apakah format daftar
-        if (str_starts_with($body, 'daftar')) {
+        if (str_starts_with($body, 'register')) {
             return $this->handleRegistration($userPhone, $body, $currentEvent);
         }
 
-        return "Perintah tidak dikenali.\nKetik *batal* untuk membatalkan sesi atau masukkan *kode event* lain.";
+        return "🤖 I didn’t understand that.\nType *help* to restart or *cancel* to reset your session.";
     }
 
     /**
-     * Handle registrasi peserta dan pembuatan tiket
+     * Handle ticket registration
      */
     private function handleRegistration(string $userPhone, string $body, int $eventId): string
     {
-        $parts = explode('#', str_replace('daftar ', '', $body));
+        $parts = explode('#', str_replace('register ', '', $body));
 
         if (count($parts) < 5) {
-            return "❗ Format salah.\nGunakan format:\n"
-                . "*daftar Nama#Gender#Umur#Pekerjaan#Nama Paket*";
+            return "⚠️ Invalid format.\nUse:\n"
+                . "*register Name#Gender#Age#Job#PackageName*";
         }
 
         [$name, $genderRaw, $age, $job, $packageName] = array_map('trim', $parts);
@@ -133,39 +143,41 @@ class WhatsappBotController extends Controller
         $event = Event::with('ticketPackages')->find($eventId);
         if (!$event) {
             Cache::forget('event_' . $userPhone);
-            return "Event tidak ditemukan. Silakan ketik ulang *kode event*.";
+            return "❌ Event not found. Please start again.";
         }
 
-        $package = TicketPackage::where('name', $packageName)->where('event_id', $eventId)->first(); // support case-insensitive
-        
+        $package = TicketPackage::whereRaw('LOWER(name) = ?', [strtolower($packageName)])
+            ->where('event_id', $eventId)
+            ->first();
+
         if (!$package) {
-            return "Paket *{$packageName}* tidak ditemukan untuk event ini.\n"
-                . "Silakan periksa kembali nama paketnya.";
+            return "❌ Ticket package *{$packageName}* not found for this event.";
         }
 
-        // Kuota
+        // Check quota
         $sold = Ticket::where('ticket_package_id', $package->id)->count();
         if ($sold >= $package->quota) {
-            return "Maaf, kuota paket *{$package->name}* sudah habis.";
+            return "🚫 Sorry, *{$package->name}* tickets are sold out.";
         }
 
         $genderMap = [
-            'laki' => 'male', 'pria' => 'male', 'laki-laki' => 'male',
-            'wanita' => 'female', 'perempuan' => 'female',
+            'male' => 'male', 'man' => 'male', 'm' => 'male',
+            'female' => 'female', 'woman' => 'female', 'f' => 'female',
         ];
         $gender = $genderMap[strtolower($genderRaw)] ?? null;
-        if (!$gender) return "Gender tidak valid. Gunakan 'laki' atau 'perempuan'.";
+        if (!$gender) {
+            return "⚠️ Invalid gender. Use *male* or *female*.";
+        }
 
-        // Buat tiket dalam transaksi
-        $ticketResult = null;
+        $ticket = null;
 
-        DB::transaction(function () use ($userPhone, $name, $gender, $age, $job, $event, $package, &$ticketResult) {
+        DB::transaction(function () use ($userPhone, $name, $gender, $age, $job, $event, $package, &$ticket) {
             $participant = Participant::firstOrCreate(
-                ['name' => ucwords($name), 'age' => (int)$age, 'gender' => $gender],
+                ['name' => ucwords($name), 'gender' => $gender, 'age' => (int)$age],
                 ['job' => ucfirst($job), 'address' => '-']
             );
 
-            $ticketResult = Ticket::create([
+            $ticket = Ticket::create([
                 'participant_id' => $participant->id,
                 'event_id' => $event->id,
                 'ticket_package_id' => $package->id,
@@ -174,15 +186,15 @@ class WhatsappBotController extends Controller
             ]);
         });
 
-        // Clear session
         Cache::forget('event_' . $userPhone);
 
-        return "✅ *Pemesanan Berhasil!*\n\n"
-            . "Nama: {$name}\n"
-            . "Event: {$event->title}\n"
-            . "Paket: {$package->name}\n"
-            . "Status: *BOOKED*\n\n"
-            . "Silakan lanjutkan pembayaran untuk mengubah status menjadi *PAID*.\n"
-            . "Ketik *kode event* lain untuk memesan tiket baru.";
+        return "✅ *Booking Successful!*\n\n"
+            . "👤 Name: {$name}\n"
+            . "🎟️ Package: {$package->name}\n"
+            . "📅 Event: {$event->title}\n"
+            . "📞 Phone: {$userPhone}\n"
+            . "📌 Status: *BOOKED*\n\n"
+            . "Please proceed with the payment to confirm your ticket.\n"
+            . "Type *help* to view other available events.";
     }
 }

@@ -3,14 +3,16 @@
 namespace App\Filament\Resources\Events\RelationManagers;
 
 use Filament\Tables\Table;
+use Filament\Actions\Action;
 use Filament\Schemas\Schema;
+use Filament\Actions\EditAction;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
+use Filament\Actions\DeleteAction;
 use Filament\Forms\Components\Toggle;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
-use App\Filament\Resources\Events\EventResource;
 use Filament\Resources\RelationManagers\RelationManager;
 
 class TicketPackagesRelationManager extends RelationManager
@@ -28,8 +30,6 @@ class TicketPackagesRelationManager extends RelationManager
                     ->required(),
                 TextInput::make('price')
                     ->label('Price')
-                    ->numeric()
-                    ->inputMode('decimal')
                     ->minValue(0),
                 TextInput::make('quota')
                     ->label('Quota')
@@ -65,19 +65,59 @@ class TicketPackagesRelationManager extends RelationManager
     {
         return $table
             ->columns([
-                TextColumn::make('name')
-                    ->searchable(),
+                TextColumn::make('name')->searchable(),
                 TextColumn::make('price')
+                    ->label('Price')
                     ->numeric()
-                    ->searchable(),
+                    ->formatStateUsing(fn($state) => 'Rp ' . number_format($state)),
                 TextColumn::make('quota')
+                    ->label('Quota')
                     ->numeric()
                     ->sortable(),
-                IconColumn::make('status')
-                    ->boolean(),
+                TextColumn::make('sold_tickets')
+                    ->label('Sold')
+                    ->getStateUsing(fn($record) => $record->sold_tickets),
+                TextColumn::make('status')
+                    ->label('Status')
+                    ->badge()
+                    ->formatStateUsing(fn($state) => $state ? 'Active' : 'Inactive')
+                    ->color(fn($state) => $state ? 'success' : 'danger'),
             ])
             ->headerActions([
                 CreateAction::make(),
+            ])
+            ->recordActions([
+                ActionGroup::make([
+                    EditAction::make()
+                        ->label('Edit')
+                        ->icon('heroicon-o-pencil'),
+
+                    Action::make('toggle_status')
+                        ->label(fn($record) => $record->status ? 'Deactivate' : 'Activate')
+                        ->icon(fn($record) => $record->status ? 'heroicon-o-x-mark' : 'heroicon-o-check')
+                        ->color(fn($record) => $record->status ? 'danger' : 'success')
+                        ->requiresConfirmation()
+                        ->action(function ($record) {
+                            $record->update(['status' => ! $record->status]);
+                            Notification::make()
+                                ->title('Status updated successfully.')
+                                ->success()
+                                ->send();
+                        }),
+
+                    DeleteAction::make()
+                        ->label('Delete')
+                        ->icon('heroicon-o-trash')
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->action(function ($record) {
+                            $record->delete();
+                            Notification::make()
+                                ->title('Ticket package deleted successfully.')
+                                ->success()
+                                ->send();
+                        }),
+                ])
             ]);
     }
 }

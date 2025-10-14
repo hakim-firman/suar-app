@@ -20,16 +20,25 @@ class EventsTable
         return $table
             ->columns([
                 TextColumn::make('title')
+                    ->label('Event')
                     ->searchable(),
                 TextColumn::make('code')
                     ->searchable(),
-                TextColumn::make('type')
-                    ->searchable(),
+                TextColumn::make('ticketPackages.name')
+                    ->badge()
+                    ->label('Package'),
                 TextColumn::make('capacity')
                     ->numeric()
                     ->sortable(),
-                IconColumn::make('status')
-                    ->boolean(),
+                TextColumn::make('total_tickets_sold')
+                    ->label('Tickets Sold')
+                    ->state(fn($record) => $record->total_tickets_sold)
+                    ->sortable(),
+                TextColumn::make('status')
+                    ->label('Status')
+                    ->badge()
+                    ->formatStateUsing(fn($state) => $state ? 'Active' : 'Inactive')
+                    ->color(fn($state) => $state ? 'success' : 'danger'),
             ])
             ->filters([
                 SelectFilter::make('status')
