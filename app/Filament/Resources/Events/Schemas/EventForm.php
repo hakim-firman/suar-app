@@ -37,6 +37,7 @@ class EventForm
                     ->multiple()
                     ->options([
                         'konser' => 'Konser',
+                        'Solo concert' => 'Solo Concert',
                         'seminar' => 'Seminar',
                         'workshop' => 'Workshop',
                         'training' => 'Training',

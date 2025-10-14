@@ -12,23 +12,27 @@ class Event extends Model
     protected $fillable = [
         'title',
         'code',
+        'type',
         'description',
         'capacity',
         'status',
     ];
 
-    protected $casts = [
-        'type' => 'array',
-    ];
-
     public function setTypeAttribute($value)
     {
-        $this->attributes['type'] = is_array($value) ? implode(',', $value) : $value;
+        if (is_array($value)) {
+            $this->attributes['type'] = implode(',', $value);
+        } else {
+            $this->attributes['type'] = $value;
+        }
     }
 
     public function getTypeAttribute($value)
     {
-        return $value ? explode(',', $value) : [];
+        if (empty($value)) {
+            return [];
+        }
+        return array_map('trim', explode(',', $value));
     }
 
     public function ticketPackages()
@@ -47,5 +51,15 @@ class Event extends Model
             ->withCount('tickets')
             ->get()
             ->sum('tickets_count');
+    }
+
+    public function participants()
+    {
+        return $this->belongsToMany(
+            Participant::class,
+            'tickets',
+            'event_id',
+            'participant_id'
+        );
     }
 }
