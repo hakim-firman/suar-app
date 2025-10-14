@@ -2,12 +2,14 @@
 
 namespace App\Filament\Resources\Participants\Tables;
 
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
+use Filament\Tables\Table;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Table;
 
 class ParticipantsTable
 {
@@ -16,23 +18,44 @@ class ParticipantsTable
         return $table
             ->columns([
                 TextColumn::make('name')
-                    ->searchable(),
-                TextColumn::make('address')
-                    ->searchable(),
+                    ->label('Name')
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('gender')
-                    ->badge(),
+                    ->badge()
+                    ->label('Gender')
+                    ->colors([
+                        'primary' => 'male',
+                        'gray' => 'female',
+                    ]),
                 TextColumn::make('age')
                     ->numeric()
+                    ->label('Age')
                     ->sortable(),
                 TextColumn::make('job')
+                    ->label('Occupation')
                     ->searchable(),
+                TextColumn::make('address')
+                    ->label('Address')
+                    ->wrap()
+                    ->placeholder('-'),
             ])
             ->filters([
                 //
             ])
             ->recordActions([
-                ViewAction::make(),
-                EditAction::make(),
+                ActionGroup::make([
+                    ViewAction::make()
+                        ->label('View Details')
+                        ->icon('heroicon-o-eye'),
+
+                    DeleteAction::make()
+                        ->label('Delete Participant')
+                        ->icon('heroicon-o-trash'),
+                ])
+                    ->label('Actions')
+                    ->icon('heroicon-m-ellipsis-vertical')
+                    ->color('gray'),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

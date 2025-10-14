@@ -3,7 +3,10 @@
 namespace App\Filament\Resources\Events\Tables;
 
 use Filament\Tables\Table;
+use Filament\Actions\Action;
 use Filament\Actions\EditAction;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\DeleteAction;
 use Filament\Tables\Filters\Filter;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -68,7 +71,28 @@ class EventsTable
                     }),
             ])
             ->recordActions([
-                EditAction::make(),
+                ActionGroup::make([
+                    EditAction::make()
+                        ->label('Edit Event')
+                        ->icon('heroicon-o-pencil-square'),
+
+                    Action::make('toggleStatus')
+                        ->label(fn($record) => $record->status ? 'Deactivate' : 'Activate')
+                        ->icon(fn($record) => $record->status ? 'heroicon-o-x-circle' : 'heroicon-o-check-circle')
+                        ->color(fn($record) => $record->status ? 'danger' : 'success')
+                        ->requiresConfirmation()
+                        ->action(function ($record) {
+                            $record->update(['status' => !$record->status]);
+                        }),
+
+                    DeleteAction::make()
+                        ->label('Delete Event')
+                        ->icon('heroicon-o-trash')
+                        ->color('danger'),
+                ])
+                    ->label('Actions')
+                    ->icon('heroicon-m-ellipsis-vertical')
+                    ->color('gray'),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
