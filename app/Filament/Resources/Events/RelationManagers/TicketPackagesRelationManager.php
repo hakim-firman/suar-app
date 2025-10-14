@@ -9,6 +9,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use App\Filament\Resources\Events\EventResource;
 use Filament\Resources\RelationManagers\RelationManager;
 
@@ -32,8 +33,23 @@ class TicketPackagesRelationManager extends RelationManager
                     ->minValue(0),
                 TextInput::make('quota')
                     ->label('Quota')
+                    ->numeric()
                     ->minValue(0)
-                    ->numeric(),
+                    ->required()
+                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                        $event = $this->getOwnerRecord();
+                        $existingQuota = $event->ticketPackages()->sum('quota');
+                        $newTotal = $existingQuota + (int) $state;
+
+                        if ($newTotal > $event->capacity) {
+                            Notification::make()
+                                ->title('Quota exceeds event capacity!')
+                                ->danger()
+                                ->send();
+
+                            $set('quota', null);
+                        }
+                    }),
                 Toggle::make('status')
                     ->label('Status')
                     ->onColor('success')

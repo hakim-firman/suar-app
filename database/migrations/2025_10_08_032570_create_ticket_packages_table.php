@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('ticket_packages', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('event_id')->nullable()->constrained()->casecadeOnDelete();
+            $table->foreignId('event_id')->nullable()->constrained()->cascadeOnDelete();
             $table->string('name');
             $table->decimal('price', 10, 2);
             $table->integer('quota')->nullable();

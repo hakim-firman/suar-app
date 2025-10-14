@@ -2,10 +2,13 @@
 
 namespace App\Filament\Resources\Events\Schemas;
 
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\Toggle;
+use Illuminate\Support\Str;
 use Filament\Schemas\Schema;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Utilities\Set;
 
 class EventForm
 {
@@ -15,18 +18,39 @@ class EventForm
             ->components([
                 TextInput::make('title')
                     ->label('Title')
-                    ->required(),
+                    ->required()
+                    ->live(onBlur: true)
+                    ->afterStateUpdated(function (Set $set, ?string $state) {
+                        if ($state) {
+                            $prefix = Str::upper(Str::slug($state, '_'));
+                            $random = rand(0, 9999);
+                            $set('code', "{$prefix}{$random}");
+                        }
+                    }),
                 TextInput::make('code')
                     ->label('Code')
+                    ->disabled()
+                    ->dehydrated(true)
                     ->required(),
+                Select::make('type')
+                    ->label('Event Type')
+                    ->multiple()
+                    ->options([
+                        'konser' => 'Konser',
+                        'seminar' => 'Seminar',
+                        'workshop' => 'Workshop',
+                        'training' => 'Training',
+                        'webinar' => 'Webinar',
+                        'conference' => 'Conference',
+                    ])
+                    ->required(),
+                TextInput::make('capacity')
+                    ->minValue(0)
+                    ->label('Capacity')
+                    ->numeric(),
                 Textarea::make('description')
                     ->label('Description')
                     ->columnSpanFull(),
-                TextInput::make('type')
-                    ->label('Type'),
-                TextInput::make('capacity')
-                    ->label('Capacity')
-                    ->numeric(),
                 Toggle::make('status')
                     ->label('Status')
                     ->default(true)

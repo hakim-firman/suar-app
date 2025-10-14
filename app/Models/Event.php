@@ -8,15 +8,28 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 class Event extends Model
 {
     use HasFactory;
-    
+
     protected $fillable = [
         'title',
         'code',
         'description',
-        'type',
         'capacity',
         'status',
     ];
+
+    protected $casts = [
+        'type' => 'array',
+    ];
+
+    public function setTypeAttribute($value)
+    {
+        $this->attributes['type'] = is_array($value) ? implode(',', $value) : $value;
+    }
+
+    public function getTypeAttribute($value)
+    {
+        return $value ? explode(',', $value) : [];
+    }
 
     public function ticketPackages()
     {
