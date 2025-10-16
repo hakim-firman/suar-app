@@ -15,9 +15,6 @@ use App\Models\TicketPackage;
 
 class WhatsappBotController extends Controller
 {
-    /**
-     * Twilio Webhook Entry Point
-     */
     public function handleWebhook(Request $request)
     {
         try {
@@ -47,9 +44,6 @@ class WhatsappBotController extends Controller
         }
     }
 
-    /**
-     * Callback status from Twilio
-     */
     public function handleCallback(Request $request)
     {
         Log::info('Twilio Callback', [
@@ -61,47 +55,80 @@ class WhatsappBotController extends Controller
         return response()->json(['status' => 'ok']);
     }
 
-    /**
-     * Main bot logic
-     */
     private function processMessage(string $userPhone, string $body): string
     {
-        // Reset user session
+        // reset
         if (in_array($body, ['cancel', 'reset', 'stop'])) {
+            Cache::forget('bot_stage_' . $userPhone);
             Cache::forget('event_' . $userPhone);
-            return "🔁 Your session has been reset.\nType *help* or *hi* to start again.";
+            return "🔁 Your session has been reset.\nType *hi* or *help* to start again.";
         }
 
+        $stage = Cache::get('bot_stage_' . $userPhone);
         $currentEvent = Cache::get('event_' . $userPhone);
 
-        if (in_array($body, ['hi', 'hello', 'help', 'menu']) && !$currentEvent) {
-            $events = Event::where('status', true)->get(['id', 'title', 'code', 'description']);
-            if ($events->isEmpty()) {
-                return "❌ No active events available right now.";
-            }
+        // entry point
+        if (in_array($body, ['hi', 'hello', 'help', 'menu', 'back'])) {
+            Cache::put('bot_stage_' . $userPhone, 'main_menu', now()->addMinutes(30));
 
-            $reply = "👋 *Welcome to the WhatsApp Ticket Assistant!*\n\n"
-                . "Here are the currently available events:\n\n";
-
-            foreach ($events as $ev) {
-                $reply .= "🎫 *{$ev->title}* — Code: *{$ev->code}*\n";
-            }
-
-            $reply .= "\nPlease type the *event code* (e.g. *EV001*) to view ticket options.";
-            return $reply;
+            return "👋 *Welcome to the WhatsApp Ticket Assistant!*\n\n"
+                . "Please choose an option by typing the number:\n\n"
+                . "1️⃣ View Event Details\n"
+                . "2️⃣ Register for an Event\n"
+                . "3️⃣ Cancel / Reset\n\n"
+                . "Type *1*, *2*, or *3* to continue.";
         }
 
-        if (!$currentEvent) {
+        if ($stage === 'main_menu') {
+            if ($body === '1') {
+                Cache::put('bot_stage_' . $userPhone, 'view_events', now()->addMinutes(30));
+
+                $events = Event::where('status', true)->get(['id', 'title', 'code', 'description']);
+                if ($events->isEmpty()) {
+                    return "❌ There are no active events right now.\n\nType *back* to return to the main menu.";
+                }
+
+                $reply = "🎫 *Active Events:*\n\n";
+                foreach ($events as $ev) {
+                    $reply .= "• *{$ev->title}* — Code: *{$ev->code}*\n";
+                }
+
+                return $reply
+                    . "\nPlease type an *event code* (e.g. *EV001*) to view ticket details.\n\nType *back* to go back.";
+            }
+
+            if ($body === '2') {
+                Cache::put('bot_stage_' . $userPhone, 'register_event', now()->addMinutes(30));
+                return "📝 Please type the *event code* you want to register for.\n"
+                    . "Example: *EV001*\n\nType *back* to return.";
+            }
+
+            if ($body === '3') {
+                Cache::forget('bot_stage_' . $userPhone);
+                Cache::forget('event_' . $userPhone);
+                return "✅ Session cleared.\nType *hi* to start again.";
+            }
+
+            return "⚠️ Invalid choice. Please type *1*, *2*, or *3*.";
+        }
+
+        if ($stage === 'view_events') {
+            if ($body === 'back') {
+                Cache::put('bot_stage_' . $userPhone, 'main_menu', now()->addMinutes(30));
+                return "🔙 Back to main menu.\n\n"
+                    . "1️⃣ View Event Details\n"
+                    . "2️⃣ Register for an Event\n"
+                    . "3️⃣ Cancel / Reset";
+            }
+
             $event = Event::whereRaw('LOWER(code) = ?', [strtolower($body)])
                 ->where('status', true)
                 ->with(['ticketPackages' => fn($q) => $q->where('status', true)])
                 ->first();
 
             if (!$event) {
-                return "❌ Event not found.\nPlease type a valid *event code* or type *help* to see the list.";
+                return "❌ Event not found.\nPlease type a valid *event code* or *back* to return.";
             }
-
-            Cache::put('event_' . $userPhone, $event->id, now()->addMinutes(30));
 
             $reply = "📢 *{$event->title}*\n"
                 . "{$event->description}\n\n"
@@ -112,25 +139,52 @@ class WhatsappBotController extends Controller
                 $reply .= "- *{$pkg->name}* — Rp " . number_format($pkg->price) . " — Remaining: {$remaining}\n";
             }
 
-            $reply .= "\nTo book, please reply in this format:\n"
-                . "*register Name#Gender#Age#Job#PackageName*\n"
-                . "Example: *register John Doe#male#25#Engineer#VIP*";
-
-            return $reply;
+            return $reply
+                . "\nType *back* to return to the event list.";
         }
 
-        if (str_starts_with($body, 'register')) {
+        if ($stage === 'register_event' && !$currentEvent) {
+            if ($body === 'back') {
+                Cache::put('bot_stage_' . $userPhone, 'main_menu', now()->addMinutes(30));
+                return "🔙 Back to main menu.\n\nType *1*, *2*, or *3*.";
+            }
+
+            $event = Event::whereRaw('LOWER(code) = ?', [strtolower($body)])
+                ->where('status', true)
+                ->first();
+
+            if (!$event) {
+                return "❌ Event not found.\nPlease type a valid *event code* or *back* to return.";
+            }
+
+            Cache::put('event_' . $userPhone, $event->id, now()->addMinutes(30));
+            Cache::put('bot_stage_' . $userPhone, 'register_form', now()->addMinutes(30));
+
+            return "✅ *{$event->title}* selected.\n\n"
+                . "Now please provide your details in this format:\n"
+                . "*register Name#Gender#Age#Job#PackageName*\n"
+                . "Example: *register John Doe#male#25#Engineer#VIP*\n\n"
+                . "Type *back* to choose another event.";
+        }
+
+        if ($stage === 'register_form' && str_starts_with($body, 'register')) {
             return $this->handleRegistration($userPhone, $body, $currentEvent);
         }
 
-        return "🤖 I didn’t understand that.\nType *help* to restart or *cancel* to reset your session.";
+        if ($body === 'back') {
+            Cache::put('bot_stage_' . $userPhone, 'main_menu', now()->addMinutes(30));
+            return "🔙 Back to main menu.\n\nType *1*, *2*, or *3*.";
+        }
+
+        return "🤖 I didn’t understand that.\nType *hi* to restart or *back* to go one step back.";
     }
 
-    /**
-     * Handle ticket registration
-     */
-    private function handleRegistration(string $userPhone, string $body, int $eventId): string
+    private function handleRegistration(string $userPhone, string $body, ?int $eventId): string
     {
+        if (!$eventId) {
+            return "⚠️ You haven’t selected an event yet.\nType *hi* to start again.";
+        }
+
         $parts = explode('#', str_replace('register ', '', $body));
 
         if (count($parts) < 5) {
@@ -154,30 +208,31 @@ class WhatsappBotController extends Controller
             return "❌ Ticket package *{$packageName}* not found for this event.";
         }
 
-        // Check quota
         $sold = Ticket::where('ticket_package_id', $package->id)->count();
         if ($sold >= $package->quota) {
             return "🚫 Sorry, *{$package->name}* tickets are sold out.";
         }
 
         $genderMap = [
-            'male' => 'male', 'man' => 'male', 'm' => 'male',
-            'female' => 'female', 'woman' => 'female', 'f' => 'female',
+            'male' => 'male',
+            'man' => 'male',
+            'm' => 'male',
+            'female' => 'female',
+            'woman' => 'female',
+            'f' => 'female',
         ];
         $gender = $genderMap[strtolower($genderRaw)] ?? null;
         if (!$gender) {
             return "⚠️ Invalid gender. Use *male* or *female*.";
         }
 
-        $ticket = null;
-
-        DB::transaction(function () use ($userPhone, $name, $gender, $age, $job, $event, $package, &$ticket) {
+        DB::transaction(function () use ($userPhone, $name, $gender, $age, $job, $event, $package) {
             $participant = Participant::firstOrCreate(
                 ['name' => ucwords($name), 'gender' => $gender, 'age' => (int)$age],
                 ['job' => ucfirst($job), 'address' => '-']
             );
 
-            $ticket = Ticket::create([
+            Ticket::create([
                 'participant_id' => $participant->id,
                 'event_id' => $event->id,
                 'ticket_package_id' => $package->id,
@@ -187,6 +242,7 @@ class WhatsappBotController extends Controller
         });
 
         Cache::forget('event_' . $userPhone);
+        Cache::forget('bot_stage_' . $userPhone);
 
         return "✅ *Booking Successful!*\n\n"
             . "👤 Name: {$name}\n"
@@ -194,7 +250,7 @@ class WhatsappBotController extends Controller
             . "📅 Event: {$event->title}\n"
             . "📞 Phone: {$userPhone}\n"
             . "📌 Status: *BOOKED*\n\n"
-            . "Please proceed with the payment to confirm your ticket.\n"
-            . "Type *help* to view other available events.";
+            . "Please proceed with payment to confirm your ticket.\n"
+            . "Type *hi* to return to the main menu.";
     }
 }

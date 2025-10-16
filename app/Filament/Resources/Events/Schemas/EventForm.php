@@ -23,7 +23,7 @@ class EventForm
                     ->afterStateUpdated(function (Set $set, ?string $state) {
                         if ($state) {
                             $prefix = Str::upper(Str::slug($state, '_'));
-                            $random = rand(0, 9999);
+                            $random = rand(0, 999);
                             $set('code', "{$prefix}{$random}");
                         }
                     }),
