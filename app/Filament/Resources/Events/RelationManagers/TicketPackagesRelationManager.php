@@ -13,6 +13,8 @@ use Filament\Forms\Components\Toggle;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Resources\RelationManagers\RelationManager;
 
 class TicketPackagesRelationManager extends RelationManager
@@ -36,27 +38,37 @@ class TicketPackagesRelationManager extends RelationManager
                     ->numeric()
                     ->minValue(0)
                     ->required()
-                    ->afterStateUpdated(function ($state, callable $set, callable $get, $livewire) {
-                        $eventRecord = $this->getOwnerRecord();
+                    ->afterStateUpdated(function ($state, Set $set, Get $get, $record) {
+                        $event = $record->event;
+                        $soldTickets = $record->tickets()->count();
 
-                        if (!$eventRecord) {
+                        if ((int)$state < $soldTickets) {
+                            Notification::make()
+                                ->title("Quota cannot be lower than sold tickets ({$soldTickets}).")
+                                ->danger()
+                                ->send();
+
+                            $set('quota', $soldTickets);
                             return;
                         }
 
-                        $ticketPackage = $this->getMountedTableActionRecord() ?? null;
-                        $oldQuota = $ticketPackage?->quota ?? 0;
+                        $totalQuota = $event->ticketPackages()->sum('quota');
+                        $totalSold = $event->ticketPackages->sum(fn($pkg) => $pkg->tickets()->count());
 
-                        $totalQuota = $eventRecord->ticketPackages()->sum('quota');
-
-                        $newTotal = $totalQuota - $oldQuota + (int) $state;
-
-                        if ($newTotal > $eventRecord->capacity) {
-                            \Filament\Notifications\Notification::make()
-                                ->title('Quota exceeds event capacity!')
-                                ->body("The total quota ($newTotal) cannot exceed the event capacity ({$eventRecord->capacity}).")
-                                ->danger()
+                        if ($totalSold >= $totalQuota) {
+                            $event->update(['status' => 0]); 
+                            Notification::make()
+                                ->title("Event {$event->title} is now full and marked as inactive.")
+                                ->warning()
                                 ->send();
-                            $set('quota', $oldQuota);
+                        } else {
+                            if ($event->status === 'inactive') {
+                                $event->update(['status' => 1]); 
+                                Notification::make()
+                                    ->title("Event {$event->title} is now reactivated.")
+                                    ->success()
+                                    ->send();
+                            }
                         }
                     }),
                 Toggle::make('status')

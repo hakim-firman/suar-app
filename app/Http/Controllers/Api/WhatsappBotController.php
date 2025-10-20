@@ -259,12 +259,12 @@ class WhatsappBotController extends Controller
             return "❌ Event not found.";
         }
 
-        $package = TicketPackage::whereRaw('LOWER(name) = ?', [strtolower($packageName)])
-            ->where('event_id', $eventId)
+        $package = $event->ticketPackages
+            ->where(fn($p) => strtolower($p->name) === strtolower($packageName))
             ->first();
 
         if (!$package) {
-            return "❌ Ticket package *{$packageName}* not found.";
+            return "❌ Ticket package *{$packageName}* not found for this event.";
         }
 
         $soldTicketsForPackage = $package->tickets()->count();
@@ -272,10 +272,12 @@ class WhatsappBotController extends Controller
             return "🚫 Sorry, *{$package->name}* tickets are sold out.";
         }
 
-        $totalEventTickets = $event->ticketPackages->sum(fn($p) => $p->tickets->count());
-        if ($totalEventTickets >= $event->capacity) {
-            if ($event->status !== false) {
-                $event->update(['status' => false]);
+        $totalQuota = $event->ticketPackages->sum('quota');
+        $totalSold = $event->ticketPackages->sum(fn($p) => $p->tickets->count());
+
+        if ($totalSold >= $totalQuota) {
+            if ($event->status !== 'inactive') {
+                $event->update(['status' => 'inactive']);
             }
             return "🚫 Sorry, *{$event->title}* has reached full capacity and is now closed for registration.";
         }
@@ -300,6 +302,7 @@ class WhatsappBotController extends Controller
         $random = rand(1000, 9999);
         $ticketCode = "{$prefix}{$random}";
 
+        // === SIMPAN DATA DALAM TRANSAKSI ===
         DB::transaction(function () use ($userPhone, $name, $gender, $age, $job, $event, $package, $ticketCode) {
             $participant = Participant::firstOrCreate(
                 ['name' => ucwords($name), 'gender' => $gender, 'age' => (int)$age],
@@ -317,8 +320,8 @@ class WhatsappBotController extends Controller
         });
 
         $totalNow = $event->ticketPackages->sum(fn($p) => $p->tickets()->count());
-        if ($totalNow >= $event->capacity && $event->status !== false) {
-            $event->update(['status' => false]);
+        if ($totalNow >= $totalQuota && $event->status !== 'inactive') {
+            $event->update(['status' => 'inactive']);
         }
 
         Cache::forget('event_' . $userPhone);

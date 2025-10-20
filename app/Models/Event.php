@@ -15,7 +15,6 @@ class Event extends Model
         'code',
         'type',
         'description',
-        'capacity',
         'status',
     ];
 
@@ -52,6 +51,16 @@ class Event extends Model
             ->where('status', 'booked')
             ->get()
             ->Count();
+    }
+
+    public function getCapacityAttribute(): int
+    {
+        return $this->ticketPackages()->sum('quota');
+    }
+
+    public function getIsFullAttribute(): bool
+    {
+        return $this->ticketPackages()->sum('remaining_quota') <= 0;
     }
 
     public function participants()

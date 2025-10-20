@@ -32,8 +32,7 @@ class EventsTable
                     ->label('Package'),
                 TextColumn::make('capacity')
                     ->label('Total Capacity')
-                    ->numeric()
-                    ->sortable(),
+                    ->state(fn($record) => $record->capacity),
                 TextColumn::make('total_tickets_sold')
                     ->label('Tickets Sold')
                     ->state(fn($record) => $record->total_tickets_sold)
