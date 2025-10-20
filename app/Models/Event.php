@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Event extends Model
@@ -47,10 +48,10 @@ class Event extends Model
 
     public function getTotalTicketsSoldAttribute(): int
     {
-        return $this->ticketPackages()
-            ->withCount('tickets')
+        return $this->tickets()
+            ->where('status', 'booked')
             ->get()
-            ->sum('tickets_count');
+            ->Count();
     }
 
     public function participants()

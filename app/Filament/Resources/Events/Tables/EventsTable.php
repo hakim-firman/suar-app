@@ -31,6 +31,7 @@ class EventsTable
                     ->badge()
                     ->label('Package'),
                 TextColumn::make('capacity')
+                    ->label('Total Capacity')
                     ->numeric()
                     ->sortable(),
                 TextColumn::make('total_tickets_sold')

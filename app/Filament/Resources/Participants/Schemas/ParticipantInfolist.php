@@ -50,7 +50,7 @@ class ParticipantInfolist
                         RepeatableEntry::make('tickets')
                             ->label('Tickets')
                             ->schema([
-                                Grid::make(3)->schema([
+                                Grid::make(4)->schema([
                                     TextEntry::make('event.title')
                                         ->label('Event')
                                         ->color('primary')
@@ -59,6 +59,9 @@ class ParticipantInfolist
                                     TextEntry::make('ticketPackage.name')
                                         ->label('Ticket Package')
                                         ->icon('heroicon-o-ticket'),
+
+                                    TextEntry::make('code')
+                                        ->label('Code Ticket'),
 
                                     TextEntry::make('status')
                                         ->label('Status')

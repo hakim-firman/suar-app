@@ -8,6 +8,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Utilities\Set;
 
 class EventForm
@@ -48,7 +49,20 @@ class EventForm
                 TextInput::make('capacity')
                     ->minValue(0)
                     ->label('Capacity')
-                    ->numeric(),
+                    ->numeric()
+                    ->afterStateUpdated(function ($state, callable $set, $record) {
+                        if ($record) {
+                            $totalQuota = $record->ticketPackages()->sum('quota');
+                            if ($state < $totalQuota) {
+                                Notification::make()
+                                    ->title('Invalid Capacity')
+                                    ->body("Capacity cannot be lower than total quota ({$totalQuota}).")
+                                    ->danger()
+                                    ->send();
+                                $set('capacity', $totalQuota);
+                            }
+                        }
+                    }),
                 Textarea::make('description')
                     ->label('Description')
                     ->columnSpanFull(),
