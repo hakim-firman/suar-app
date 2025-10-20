@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Participants\Tables;
 
+use App\Models\Event;
 use Filament\Tables\Table;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
@@ -10,6 +11,7 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 
 class ParticipantsTable
 {
@@ -35,13 +37,20 @@ class ParticipantsTable
                 TextColumn::make('job')
                     ->label('Occupation')
                     ->searchable(),
-                TextColumn::make('address')
-                    ->label('Address')
-                    ->wrap()
-                    ->placeholder('-'),
+                TextColumn::make('events.title')
+                    ->badge()
+                    ->label('Event Title'),
             ])
             ->filters([
-                //
+                SelectFilter::make('gender')
+                    ->label('Gender')
+                    ->options([
+                        'Male' => 'Male',
+                        'Female' => 'Female',
+                    ]),
+                SelectFilter::make('event')
+                    ->label('Event Title')
+                    ->relationship('events', 'title')
             ])
             ->recordActions([
                 ActionGroup::make([
