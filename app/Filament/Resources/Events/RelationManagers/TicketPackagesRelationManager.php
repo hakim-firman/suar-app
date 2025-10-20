@@ -36,18 +36,27 @@ class TicketPackagesRelationManager extends RelationManager
                     ->numeric()
                     ->minValue(0)
                     ->required()
-                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                        $event = $this->getOwnerRecord();
-                        $existingQuota = $event->ticketPackages()->sum('quota');
-                        $newTotal = $existingQuota + (int) $state;
+                    ->afterStateUpdated(function ($state, callable $set, callable $get, $livewire) {
+                        $eventRecord = $this->getOwnerRecord();
 
-                        if ($newTotal > $event->capacity) {
-                            Notification::make()
+                        if (!$eventRecord) {
+                            return;
+                        }
+
+                        $ticketPackage = $this->getMountedTableActionRecord() ?? null;
+                        $oldQuota = $ticketPackage?->quota ?? 0;
+
+                        $totalQuota = $eventRecord->ticketPackages()->sum('quota');
+
+                        $newTotal = $totalQuota - $oldQuota + (int) $state;
+
+                        if ($newTotal > $eventRecord->capacity) {
+                            \Filament\Notifications\Notification::make()
                                 ->title('Quota exceeds event capacity!')
+                                ->body("The total quota ($newTotal) cannot exceed the event capacity ({$eventRecord->capacity}).")
                                 ->danger()
                                 ->send();
-
-                            $set('quota', null);
+                            $set('quota', $oldQuota);
                         }
                     }),
                 Toggle::make('status')
